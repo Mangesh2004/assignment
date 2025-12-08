@@ -1,12 +1,14 @@
 // Prisma schema for Smart Chatbot Application
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -27,6 +29,7 @@ model Deal {
   description String
   price       Float
   imageURL    String
+  embedding   Unsupported("vector(1536)")?
   createdAt   DateTime @default(now())
 }
 

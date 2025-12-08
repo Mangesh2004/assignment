@@ -1,248 +1,128 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth, AuthModal } from "@/components/auth";
-import { ChatSidebar } from "@/components/chat/ChatSidebar";
-import { ChatMessages } from "@/components/chat/ChatMessages";
-import { ChatInput } from "@/components/chat/ChatInput";
-import { type Message } from "@/components/chat/MessageBubble";
-import { LogOut, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-interface ChatHistory {
-    id: string;
-    title: string;
-    createdAt: Date;
-}
+import { ChatSidebar, ChatInput, ChatMessages } from "@/components/chat";
+import { Menu } from "lucide-react";
 
 export default function ChatPage() {
-    const { user, isAuthenticated, isLoading, logout } = useAuth();
-    const [messages, setMessages] = useState<Message[]>([]);
+    const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+    const [messages, setMessages] = useState<any[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const [chats, setChats] = useState<ChatHistory[]>([]);
+    const [chats, setChats] = useState<any[]>([]);
 
-    // Load chat history when authenticated
+    // State Layout Separation
+    const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     useEffect(() => {
         if (isAuthenticated) {
-            loadChats();
+            fetch("/api/chat")
+                .then(res => res.json())
+                .then(data => {
+                    if (data.chats) setChats(data.chats.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })));
+                })
+                .catch(err => console.error(err));
         }
     }, [isAuthenticated]);
 
-    // Load welcome message when authenticated and no messages
     useEffect(() => {
         if (isAuthenticated && user && messages.length === 0) {
-            setMessages([
-                {
-                    id: "welcome",
-                    role: "bot",
-                    content: `Hello ${user.name}! 👋 Welcome to Smart ChatBot. I can help you with deals, orders, payments, and more. What would you like to know?`,
-                    type: "menu",
-                    metadata: {
-                        options: ["Show Deals", "My Orders", "Payment Status", "My Profile"],
-                    },
-                    createdAt: new Date(),
-                },
-            ]);
+            setMessages([{
+                id: "intro",
+                role: "bot",
+                content: "Hello! I can help you find deals, check orders, or manage your profile.",
+                type: "menu",
+                metadata: { options: ["Deals", "Orders", "Profile"] },
+                createdAt: new Date()
+            }]);
         }
     }, [isAuthenticated, user, messages.length]);
 
-    const loadChats = async () => {
+    const loadChat = async (id: string) => {
         try {
-            const res = await fetch("/api/chat");
-            const data = await res.json();
-            if (data.chats) {
-                setChats(data.chats.map((c: { id: string; title: string; createdAt: string }) => ({
-                    ...c,
-                    createdAt: new Date(c.createdAt),
-                })));
-            }
-        } catch (error) {
-            console.error("Failed to load chats:", error);
-        }
-    };
-
-    const loadChatMessages = async (chatId: string) => {
-        try {
-            const res = await fetch(`/api/chat?chatId=${chatId}`);
+            const res = await fetch(`/api/chat?chatId=${id}`);
             const data = await res.json();
             if (data.messages) {
-                setMessages(data.messages.map((m: { id: string; role: string; content: string; type: string; metadata: Record<string, unknown>; createdAt: string }) => ({
-                    ...m,
-                    createdAt: new Date(m.createdAt),
-                })));
+                setMessages(data.messages.map((m: any) => ({ ...m, createdAt: new Date(m.createdAt) })));
+                setActiveChatId(id);
             }
-        } catch (error) {
-            console.error("Failed to load messages:", error);
-        }
+        } catch (e) { console.error(e); }
     };
 
-    const handleSendMessage = useCallback(async (content: string) => {
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: "user",
-            content,
-            type: "text",
-            createdAt: new Date(),
-        };
-        setMessages((prev) => [...prev, userMessage]);
+    const handleSend = async (text: string) => {
+        const tempId = Date.now().toString();
+        const userMsg = { id: tempId, role: "user", content: text, type: "text", createdAt: new Date() };
+        setMessages(p => [...p, userMsg]);
         setIsSending(true);
 
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: content,
-                    chatId: activeChatId,
-                }),
+                body: JSON.stringify({ message: text, chatId: activeChatId })
             });
-
             const data = await res.json();
 
             if (data.success && data.message) {
-                // Update active chat ID if new chat was created
                 if (data.chatId && data.chatId !== activeChatId) {
                     setActiveChatId(data.chatId);
-                    loadChats(); // Refresh chat list
+                    fetch("/api/chat").then(r => r.json()).then(d => {
+                        if (d.chats) setChats(d.chats.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })));
+                    });
                 }
-
-                const botMessage: Message = {
-                    id: data.message.id,
-                    role: "bot",
-                    content: data.message.content,
-                    type: data.message.type,
-                    metadata: data.message.metadata,
-                    createdAt: new Date(data.message.createdAt),
-                };
-                setMessages((prev) => [...prev, botMessage]);
+                const botMsg = { ...data.message, createdAt: new Date(data.message.createdAt) };
+                setMessages(p => [...p, botMsg]);
             } else {
-                // Error response
-                const errorMessage: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: "bot",
-                    content: data.error || "Sorry, something went wrong. Please try again.",
-                    type: "text",
-                    createdAt: new Date(),
-                };
-                setMessages((prev) => [...prev, errorMessage]);
+                setMessages(p => [...p, { id: Date.now().toString(), role: "bot", content: "Error: " + (data.error || "Failed"), type: "text", createdAt: new Date() }]);
             }
-        } catch (error) {
-            console.error("Chat error:", error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "bot",
-                content: "Sorry, I'm having trouble connecting. Please try again.",
-                type: "text",
-                createdAt: new Date(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
+        } catch (e) {
+            console.error(e);
+            setMessages(p => [...p, { id: Date.now().toString(), role: "bot", content: "Connection error.", type: "text", createdAt: new Date() }]);
         } finally {
             setIsSending(false);
         }
-    }, [activeChatId]);
-
-    const handleNewChat = useCallback(() => {
-        setActiveChatId(null);
-        setMessages([
-            {
-                id: "welcome-new",
-                role: "bot",
-                content: "Hello! 👋 How can I help you today?",
-                type: "menu",
-                metadata: {
-                    options: ["Show Deals", "My Orders", "Payment Status", "My Profile"],
-                },
-                createdAt: new Date(),
-            },
-        ]);
-    }, []);
-
-    const handleSelectChat = useCallback((chatId: string) => {
-        setActiveChatId(chatId);
-        loadChatMessages(chatId);
-    }, []);
-
-    const handleMenuAction = useCallback((action: string) => {
-        const actionMessages: Record<string, string> = {
-            deals: "Show me the latest deals",
-            orders: "Show my orders",
-            payment: "Check my payment status",
-            profile: "Show my profile",
-        };
-        if (actionMessages[action]) {
-            handleSendMessage(actionMessages[action]);
-        }
-    }, [handleSendMessage]);
-
-    const handleOptionClick = useCallback((option: string) => {
-        handleSendMessage(option);
-    }, [handleSendMessage]);
-
-    const handleLogout = async () => {
-        await logout();
-        setMessages([]);
-        setChats([]);
-        setActiveChatId(null);
     };
 
-    // Loading state
-    if (isLoading) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-                <div className="text-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-                </div>
-            </div>
-        );
-    }
+    if (isAuthLoading) return <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900 dark:border-zinc-100" /></div>;
+    if (!isAuthenticated) return <AuthModal onAuthSuccess={() => { }} />;
 
-    // Not authenticated - show login
-    if (!isAuthenticated) {
-        return <AuthModal onAuthSuccess={() => { }} />;
-    }
-
-    // Authenticated - show chat
     return (
-        <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-            {/* Sidebar */}
+        <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden font-sans text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
             <ChatSidebar
+                isOpen={desktopSidebarOpen}
+                mobileOpen={mobileMenuOpen}
+                setMobileOpen={setMobileMenuOpen}
                 chats={chats}
                 activeChatId={activeChatId}
-                onNewChat={handleNewChat}
-                onSelectChat={handleSelectChat}
-                onMenuAction={handleMenuAction}
+                onNewChat={() => {
+                    setActiveChatId(null);
+                    setMessages([{ id: "new", role: "bot", content: "How can I help you?", type: "text", createdAt: new Date() }]);
+                }}
+                onSelectChat={loadChat}
+                user={user || undefined}
             />
 
-            {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Header */}
-                <header className="h-16 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-between px-6">
-                    <div>
-                        <h1 className="font-semibold text-gray-900 dark:text-white">
-                            Chat with {user?.name}
-                        </h1>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            AI Assistant • Powered by OpenAI
-                        </p>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-                        <LogOut className="h-4 w-4" />
-                        Logout
-                    </Button>
-                </header>
+            <main className="flex-1 flex flex-col h-full relative min-w-0 bg-white dark:bg-zinc-950 transition-colors duration-300">
+                <div className="lg:hidden p-4 flex items-center border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 z-10">
+                    <button onClick={() => setMobileMenuOpen(true)} className="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <Menu className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                    </button>
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 mx-auto pr-8">SmartBot</span>
+                </div>
 
-                {/* Messages */}
                 <ChatMessages
                     messages={messages}
                     isLoading={isSending}
-                    onOptionClick={handleOptionClick}
+                    onOptionClick={handleSend}
                 />
 
-                {/* Input */}
-                <ChatInput onSendMessage={handleSendMessage} isLoading={isSending} />
-            </div>
+                <ChatInput
+                    onSend={handleSend}
+                    isLoading={isSending}
+                />
+            </main>
         </div>
     );
 }

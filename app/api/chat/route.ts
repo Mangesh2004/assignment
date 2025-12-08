@@ -54,35 +54,103 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        // Create agent and run
-        const agent = createChatbotAgent(session.userId);
-        const result = await run(agent, message);
+        // ---------------------------------------------------------
+        // Fetch Chat History (Context) - include in prompt
+        // ---------------------------------------------------------
+        const historyMessages = await prisma.message.findMany({
+            where: { chatId: chat.id },
+            orderBy: { createdAt: "asc" },
+            take: 8, // Limit history to last 8 messages
+        });
 
-        // Parse the response to check if it's a structured response from tools
-        let responseContent = result.finalOutput || "I'm sorry, I couldn't process your request.";
+        // Format history as a context string for the agent
+        const historyContext = historyMessages.map((msg: any) => {
+            const role = msg.role === "bot" ? "Assistant" : "User";
+            // Truncate long content to save tokens and prevent confusion
+            let content = msg.content;
+            if (content.length > 500) content = content.slice(0, 500) + "... (truncated)";
+            return `${role}: ${content}`;
+        }).join("\n");
+
+        // ---------------------------------------------------------
+        // STRATEGY: Pre-extract price parameters from user message
+        // This is more reliable than relying on LLM to parse prices
+        // ---------------------------------------------------------
+        function extractPriceHints(msg: string): string {
+            const lowerMsg = msg.toLowerCase();
+            let minPrice = 0;
+            let maxPrice = 0;
+
+            // Pattern: "below/under/less than X" or "< X"
+            const belowMatch = lowerMsg.match(/(?:below|under|less\s*than|cheaper\s*than|<)\s*(?:rs\.?|₹|inr)?\s*(\d+)/i);
+            if (belowMatch) {
+                maxPrice = parseInt(belowMatch[1], 10);
+            }
+
+            // Pattern: "above/over/more than X" or "> X"
+            const aboveMatch = lowerMsg.match(/(?:above|over|more\s*than|greater\s*than|>)\s*(?:rs\.?|₹|inr)?\s*(\d+)/i);
+            if (aboveMatch) {
+                minPrice = parseInt(aboveMatch[1], 10);
+            }
+
+            // Pattern: "between X and Y" or "X to Y" or "X-Y"
+            const betweenMatch = lowerMsg.match(/(?:between|from)?\s*(?:rs\.?|₹|inr)?\s*(\d+)\s*(?:to|and|-)\s*(?:rs\.?|₹|inr)?\s*(\d+)/i);
+            if (betweenMatch && !belowMatch && !aboveMatch) {
+                minPrice = parseInt(betweenMatch[1], 10);
+                maxPrice = parseInt(betweenMatch[2], 10);
+            }
+
+            // Build hint string if prices were extracted
+            if (minPrice > 0 || maxPrice > 0) {
+                return `\n\n[SYSTEM HINT: Extracted price filters from user message - minPrice=${minPrice}, maxPrice=${maxPrice}. Use these values when calling get_deals tool.]`;
+            }
+            return "";
+        }
+
+        const priceHints = extractPriceHints(message);
+
+        // Create agent with history context
+        const agent = createChatbotAgent(session.userId);
+
+        // Build the input prompt with history context and price hints
+        let inputPrompt = message;
+        if (historyContext) {
+            inputPrompt = `Previous conversation:\n${historyContext}\n\nUser: ${message}`;
+        }
+        inputPrompt += priceHints;
+
+        console.log("Agent Input:", inputPrompt);
+
+        const result = await run(agent, inputPrompt);
+
+        // Parse the response - with outputType, finalOutput is already a structured object
+        const output = result.finalOutput as any;
+
+        let responseContent = "";
         let responseType = "text";
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let metadata: any = undefined;
 
-        try {
-            // Check if the response is a JSON string from a tool
-            const parsed = JSON.parse(responseContent);
-            if (parsed.type) {
-                responseType = parsed.type;
-                responseContent = parsed.content;
-                if (parsed.deals) {
-                    metadata = { deals: parsed.deals };
-                } else if (parsed.orders) {
-                    metadata = { orders: parsed.orders };
-                } else if (parsed.payments) {
-                    metadata = { payments: parsed.payments, summary: parsed.summary };
-                } else if (parsed.profile) {
-                    metadata = { profile: parsed.profile };
-                }
+        console.log("Agent Final Output:", JSON.stringify(output, null, 2));
+
+        if (typeof output === 'object' && output !== null && output.type) {
+            responseType = output.type;
+            responseContent = output.content || "";
+
+            if (output.type === "deals" && output.deals) {
+                metadata = { deals: output.deals };
+            } else if (output.type === "orders" && output.orders) {
+                metadata = { orders: output.orders };
+            } else if (output.type === "payments") {
+                metadata = { payments: output.payments, summary: output.summary };
+            } else if (output.type === "profile" && output.profile) {
+                metadata = { profile: output.profile };
             }
-        } catch {
-            // Response is plain text, use as-is
+        } else {
+            // Fallback for string output (should not happen with strict outputType)
+            responseContent = typeof output === 'string' ? output : "Processing complete.";
         }
+
 
         // Save bot message
         const botMessage = await prisma.message.create({
