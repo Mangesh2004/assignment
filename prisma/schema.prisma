@@ -1,0 +1,84 @@
+// Prisma schema for Smart Chatbot Application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String    @unique
+  email     String    @unique
+  address   String?
+  createdAt DateTime  @default(now())
+  orders    Order[]
+  sessions  Session[]
+  chats     Chat[]
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  price       Float
+  imageURL    String
+  createdAt   DateTime @default(now())
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  userId      String
+  productName String
+  imageURL    String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  payment     Payment?
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  amountPaid    Float
+  pendingAmount Float
+  createdAt     DateTime @default(now())
+  order         Order    @relation(fields: [orderId], references: [id])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  otp       String?
+  otpExpiry DateTime?
+  verified  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String    @default("New Chat")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chatId    String
+  role      String   // "user" | "bot"
+  content   String
+  type      String   @default("text") // "text" | "card" | "menu"
+  metadata  Json?    // For cards: { dealId, orderId, etc. }
+  createdAt DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+}
