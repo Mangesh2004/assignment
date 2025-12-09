@@ -335,6 +335,11 @@ export function createChatbotAgent(userId: string) {
 4. **User Context**: Current User ID is "${userId}"`,
         tools: [getDealsTool, placeOrderTool, getOrdersTool, getPaymentStatusTool, getUserProfileTool],
         model: "gpt-5-mini-2025-08-07",
+        modelSettings:{
+            reasoning: {
+                effort:"none"
+            }
+        },
         outputType: AgentOutputSchema,
     });
 }
