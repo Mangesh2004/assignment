@@ -53,33 +53,124 @@ export default function ChatPage() {
 
     const handleSend = async (text: string) => {
         const tempId = Date.now().toString();
+        const botTempId = (Date.now() + 1).toString();
         const userMsg = { id: tempId, role: "user", content: text, type: "text", createdAt: new Date() };
-        setMessages(p => [...p, userMsg]);
+
+        // Add user message and placeholder bot message
+        setMessages(p => [...p, userMsg, { id: botTempId, role: "bot", content: "", type: "text", createdAt: new Date() }]);
         setIsSending(true);
 
         try {
-            const res = await fetch("/api/chat", {
+            const res = await fetch("/api/chat/stream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text, chatId: activeChatId })
             });
-            const data = await res.json();
 
-            if (data.success && data.message) {
-                if (data.chatId && data.chatId !== activeChatId) {
-                    setActiveChatId(data.chatId);
-                    fetch("/api/chat").then(r => r.json()).then(d => {
-                        if (d.chats) setChats(d.chats.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })));
-                    });
+            if (!res.ok) {
+                const errorData = await res.json();
+                setMessages(p => p.map(m => m.id === botTempId ? { ...m, content: "Error: " + (errorData.error || "Failed") } : m));
+                setIsSending(false);
+                return;
+            }
+
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedText = "";
+            let thinkingSteps: any[] = [];
+
+            // Mark as thinking initially
+            setMessages(p => p.map(m =>
+                m.id === botTempId ? { ...m, isThinking: true, thinkingSteps: [] } : m
+            ));
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split("\n");
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (data.type === "text") {
+                                    // Accumulate streaming text
+                                    accumulatedText += data.content;
+                                    setMessages(p => p.map(m =>
+                                        m.id === botTempId ? { ...m, content: accumulatedText } : m
+                                    ));
+                                } else if (data.type === "item") {
+                                    // Progressive item streaming - add items one by one
+                                    setMessages(p => p.map(m => {
+                                        if (m.id !== botTempId) return m;
+
+                                        const currentMetadata = m.metadata || {};
+                                        let newType = m.type;
+
+                                        if (data.itemType === "deal") {
+                                            const deals = [...(currentMetadata.deals || []), data.item];
+                                            newType = "deals";
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, deals }, content: "Here are some deals:" };
+                                        } else if (data.itemType === "order") {
+                                            const orders = [...(currentMetadata.orders || []), data.item];
+                                            newType = "orders";
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, orders }, content: "Here are your orders:" };
+                                        } else if (data.itemType === "payment") {
+                                            const payments = [...(currentMetadata.payments || []), data.item];
+                                            newType = "payments";
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, payments }, content: "Here is your payment info:" };
+                                        } else if (data.itemType === "paymentSummary") {
+                                            return { ...m, metadata: { ...currentMetadata, summary: data.item } };
+                                        } else if (data.itemType === "profile") {
+                                            newType = "profile";
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, profile: data.item }, content: "Here is your profile:" };
+                                        }
+                                        return m;
+                                    }));
+                                } else if (data.type === "thinking") {
+                                    // Accumulate thinking steps
+                                    thinkingSteps = [...thinkingSteps, data];
+                                    setMessages(p => p.map(m =>
+                                        m.id === botTempId ? { ...m, thinkingSteps: thinkingSteps } : m
+                                    ));
+                                } else if (data.type === "done") {
+                                    // Replace with final structured message, preserve thinking steps
+                                    const botMsg = {
+                                        ...data.message,
+                                        createdAt: new Date(data.message.createdAt),
+                                        thinkingSteps: thinkingSteps,
+                                        isThinking: false
+                                    };
+                                    setMessages(p => p.map(m => m.id === botTempId ? botMsg : m));
+
+                                    // Update chat list if new chat was created
+                                    if (data.chatId && data.chatId !== activeChatId) {
+                                        setActiveChatId(data.chatId);
+                                        fetch("/api/chat").then(r => r.json()).then(d => {
+                                            if (d.chats) setChats(d.chats.map((c: any) => ({ ...c, createdAt: new Date(c.createdAt) })));
+                                        });
+                                    }
+                                } else if (data.type === "error") {
+                                    setMessages(p => p.map(m =>
+                                        m.id === botTempId ? { ...m, content: "Error: " + data.error, isThinking: false } : m
+                                    ));
+                                }
+                            } catch (parseError) {
+                                // Ignore JSON parse errors for incomplete chunks
+                            }
+                        }
+                    }
                 }
-                const botMsg = { ...data.message, createdAt: new Date(data.message.createdAt) };
-                setMessages(p => [...p, botMsg]);
-            } else {
-                setMessages(p => [...p, { id: Date.now().toString(), role: "bot", content: "Error: " + (data.error || "Failed"), type: "text", createdAt: new Date() }]);
             }
         } catch (e) {
             console.error(e);
-            setMessages(p => [...p, { id: Date.now().toString(), role: "bot", content: "Connection error.", type: "text", createdAt: new Date() }]);
+            setMessages(p => p.map(m =>
+                m.id === botTempId ? { ...m, content: "Connection error." } : m
+            ));
         } finally {
             setIsSending(false);
         }

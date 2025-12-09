@@ -1,8 +1,12 @@
 
-import { Agent, tool } from "@openai/agents";
+import { Agent, tool, setTracingDisabled } from "@openai/agents";
+import { aisdk } from "@openai/agents-extensions";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "./embeddings";
+
+
 
 // Tool to get deals from database with detailed search
 // Using string type with "NULL" for unspecified values - clearer for LLM
@@ -334,12 +338,8 @@ export function createChatbotAgent(userId: string) {
 
 4. **User Context**: Current User ID is "${userId}"`,
         tools: [getDealsTool, placeOrderTool, getOrdersTool, getPaymentStatusTool, getUserProfileTool],
-        model: "gpt-5-mini-2025-08-07",
-        modelSettings:{
-            reasoning: {
-                effort:"minimal"
-            }
-        },
+        model: aisdk(google("gemini-3-pro-preview")),
+        
         outputType: AgentOutputSchema,
     });
 }

@@ -7,9 +7,13 @@ import { DealMessage } from "./DealMessage";
 import { OrderMessage } from "./OrderMessage";
 import { PaymentMessage } from "./PaymentMessage";
 import { ProfileMessage } from "./ProfileMessage";
+import { TextMessage } from "./TextMessage";
+import { ThinkingBubble } from "./ThinkingBubble";
 
 export function MessageBubble({ message, onOptionClick }: { message: any, onOptionClick?: (opt: string) => void }) {
     const isBot = message.role === "bot";
+    const thinkingSteps = message.thinkingSteps || [];
+    const isThinking = message.isThinking || false;
 
     return (
         <div className={cn("flex w-full mb-6", isBot ? "justify-start" : "justify-end")}>
@@ -29,16 +33,20 @@ export function MessageBubble({ message, onOptionClick }: { message: any, onOpti
                     {/* Name Label */}
                     {isBot && <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mb-1">SmartBot</span>}
 
-                    {/* Text Bubble */}
+                    {/* Thinking Bubble - shows tool calls */}
+                    {isBot && (thinkingSteps.length > 0 || isThinking) && (
+                        <ThinkingBubble steps={thinkingSteps} isThinking={isThinking} />
+                    )}
+
+                    {/* Text Bubble - Bot gets a card with markdown, User gets a simple bubble */}
                     {message.type === "text" && (
-                        <div className={cn(
-                            "text-sm leading-relaxed whitespace-pre-wrap",
-                            isBot
-                                ? "text-zinc-700 dark:text-zinc-300"
-                                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-4 py-2.5 rounded-2xl rounded-tr-sm"
-                        )}>
-                            {message.content}
-                        </div>
+                        isBot ? (
+                            <TextMessage content={message.content} />
+                        ) : (
+                            <div className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap">
+                                {message.content}
+                            </div>
+                        )
                     )}
 
                     {/* Deals Cards */}
