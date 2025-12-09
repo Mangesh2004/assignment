@@ -103,7 +103,9 @@ export default function ChatPage() {
 
                                     // Regex patterns for different response types
                                     const dealRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"title"\s*:\s*"([^"]*)"\s*,\s*"description"\s*:\s*"([^"]*)"\s*,\s*"price"\s*:\s*(\d+(?:\.\d+)?)\s*,\s*"imageURL"\s*:\s*"([^"]*)"\s*\}/g;
-                                    const orderRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"productName"\s*:\s*"([^"]*)"\s*,\s*"status"\s*:\s*"([^"]*)"\s*,\s*"imageURL"\s*:\s*"([^"]*)"\s*,\s*"paymentUrl"\s*:\s*"([^"]*)"\s*\}/g;
+                                    // Order regex that handles optional paymentUrl
+                                    // Handles {\"id\":..., \"productName\":..., \"status\":..., \"imageURL\":...}
+                                    const orderRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"productName"\s*:\s*"([^"]*)"\s*,\s*"status"\s*:\s*"([^"]*)"\s*,\s*"imageURL"\s*:\s*"([^"]*)"(?:\s*,\s*"paymentUrl"\s*:\s*"([^"]*)")?\s*\}/g;
 
                                     setMessages(p => p.map(m => {
                                         if (m.id !== botTempId) return m;
@@ -138,7 +140,7 @@ export default function ChatPage() {
                                                     productName: match[2],
                                                     status: match[3],
                                                     imageURL: match[4],
-                                                    paymentUrl: match[5]
+                                                    paymentUrl: match[5] || "" // Handle optional paymentUrl
                                                 });
                                             }
                                             if (orders.length > 0 && orders.length > (currentMetadata.orders?.length || 0)) {
