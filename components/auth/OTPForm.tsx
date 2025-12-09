@@ -94,14 +94,14 @@ export function OTPForm({ sessionId, onSuccess, onResend, maskedEmail }: OTPForm
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2 text-center">
-                <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4">
-                    <KeyRound className="h-6 w-6 text-white" />
+                <div className="h-12 w-12 mx-auto rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-4">
+                    <KeyRound className="h-6 w-6 text-zinc-900 dark:text-zinc-100" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                     Enter OTP
                 </h3>
                 {maskedEmail && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
                         We sent a code to {maskedEmail}
                     </p>
                 )}
@@ -121,7 +121,7 @@ export function OTPForm({ sessionId, onSuccess, onResend, maskedEmail }: OTPForm
                         onKeyDown={(e) => handleKeyDown(index, e)}
                         onPaste={handlePaste}
                         disabled={isLoading}
-                        className="w-12 h-14 text-center text-xl font-bold rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:opacity-50"
+                        className="w-12 h-14 text-center text-xl font-bold rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:border-zinc-900 dark:focus:border-zinc-100 focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-100/20 outline-none transition-all disabled:opacity-50"
                     />
                 ))}
             </div>
@@ -154,7 +154,7 @@ export function OTPForm({ sessionId, onSuccess, onResend, maskedEmail }: OTPForm
                     <button
                         type="button"
                         onClick={handleResend}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                        className="text-sm text-zinc-900 dark:text-zinc-100 hover:underline inline-flex items-center gap-1"
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Resend OTP

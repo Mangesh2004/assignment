@@ -59,8 +59,8 @@ export function RegisterForm({ phone, onSuccess, onBack }: RegisterFormProps) {
             </button>
 
             <div className="text-center mb-6">
-                <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-3">
-                    <User className="h-6 w-6 text-white" />
+                <div className="h-12 w-12 mx-auto rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+                    <User className="h-6 w-6 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Create Account

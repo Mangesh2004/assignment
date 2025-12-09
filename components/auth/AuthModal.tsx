@@ -60,23 +60,18 @@ export function AuthModal({ onAuthSuccess }: AuthModalProps) {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
-            {/* Background decoration */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400/20 rounded-full blur-3xl" />
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
 
-            <Card className="relative w-full max-w-md p-8 backdrop-blur-sm bg-white/80 dark:bg-gray-900/80">
+            <Card className="relative w-full max-w-md p-8 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-xl">
-                        <MessageSquare className="h-8 w-8 text-white" />
+                    <div className="h-16 w-16 mx-auto rounded-2xl bg-zinc-900 dark:bg-zinc-50 flex items-center justify-center mb-4 shadow-sm">
+                        <MessageSquare className="h-8 w-8 text-white dark:text-zinc-900" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                         Welcome to ChatBot
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-1">
                         {step === "phone" && "Enter your phone number to continue"}
                         {step === "register" && "Create your account"}
                         {step === "otp" && "Verify your identity"}
@@ -110,7 +105,7 @@ export function AuthModal({ onAuthSuccess }: AuthModalProps) {
 
                 {/* Footer */}
                 <div className="mt-8 text-center">
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
                         By continuing, you agree to our Terms of Service
                     </p>
                 </div>
