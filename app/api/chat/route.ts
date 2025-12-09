@@ -232,3 +232,53 @@ export async function GET(request: NextRequest) {
         );
     }
 }
+
+// Delete a chat with all its messages
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getSession();
+        if (!session) {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
+        }
+
+        const { searchParams } = new URL(request.url);
+        const chatId = searchParams.get("chatId");
+
+        if (!chatId) {
+            return NextResponse.json(
+                { error: "Chat ID is required" },
+                { status: 400 }
+            );
+        }
+
+        // Verify ownership and delete
+        // onDelete: Cascade in schema handles message deletion automatically, 
+        // but we verify ownership first for security.
+        const chat = await prisma.chat.findUnique({
+            where: { id: chatId, userId: session.userId },
+        });
+
+        if (!chat) {
+            return NextResponse.json(
+                { error: "Chat not found or unauthorized" },
+                { status: 404 }
+            );
+        }
+
+        await prisma.chat.delete({
+            where: { id: chatId },
+        });
+
+        return NextResponse.json({ success: true, deletedId: chatId });
+
+    } catch (error) {
+        console.error("Delete chat error:", error);
+        return NextResponse.json(
+            { error: "Failed to delete chat" },
+            { status: 500 }
+        );
+    }
+}

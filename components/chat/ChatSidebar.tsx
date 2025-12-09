@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Plus, MessageSquare, Settings, User as UserIcon, Moon, Sun, Monitor } from "lucide-react";
+import { Plus, MessageSquare, Settings, User as UserIcon, Moon, Sun, Monitor, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useTheme } from "next-themes";
@@ -14,6 +14,7 @@ interface ChatSidebarProps {
     chats: { id: string; title: string; createdAt: Date }[];
     activeChatId: string | null;
     onSelectChat: (id: string) => void;
+    onDeleteChat?: (id: string) => void;
     className?: string;
     user?: { name?: string; email?: string };
 }
@@ -26,6 +27,7 @@ export function ChatSidebar({
     chats,
     activeChatId,
     onSelectChat,
+    onDeleteChat,
     className,
     user
 }: ChatSidebarProps) {
@@ -70,6 +72,19 @@ export function ChatSidebar({
                                 )}
                             >
                                 <span className="truncate flex-1">{chat.title}</span>
+                                {onDeleteChat && (
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm("Are you sure you want to delete this chat?")) {
+                                                onDeleteChat(chat.id);
+                                            }
+                                        }}
+                                        className="rounded transition-all"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-500 hover:text-red-500" />
+                                    </div>
+                                )}
                             </button>
                         ))}
                     </div>

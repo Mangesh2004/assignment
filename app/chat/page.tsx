@@ -88,6 +88,22 @@ export default function ChatPage() {
     if (isAuthLoading) return <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900 dark:border-zinc-100" /></div>;
     if (!isAuthenticated) return <AuthModal onAuthSuccess={() => { }} />;
 
+    const handleDeleteChat = async (id: string) => {
+        try {
+            const res = await fetch(`/api/chat?chatId=${id}`, { method: "DELETE" });
+            const data = await res.json();
+            if (data.success) {
+                setChats(chats.filter(c => c.id !== id));
+                if (activeChatId === id) {
+                    setActiveChatId(null);
+                    setMessages([{ id: "new", role: "bot", content: "Chat deleted. How can I help you?", type: "text", createdAt: new Date() }]);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to delete chat", e);
+        }
+    };
+
     return (
         <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden font-sans text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
             <ChatSidebar
@@ -101,6 +117,7 @@ export default function ChatPage() {
                     setMessages([{ id: "new", role: "bot", content: "How can I help you?", type: "text", createdAt: new Date() }]);
                 }}
                 onSelectChat={loadChat}
+                onDeleteChat={handleDeleteChat}
                 user={user || undefined}
             />
 
