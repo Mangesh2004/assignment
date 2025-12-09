@@ -337,7 +337,7 @@ export function createChatbotAgent(userId: string) {
         model: "gpt-5-mini-2025-08-07",
         modelSettings:{
             reasoning: {
-                effort:"none"
+                effort:"minimal"
             }
         },
         outputType: AgentOutputSchema,
