@@ -100,11 +100,58 @@ export default function ChatPage() {
                                 if (data.type === "text") {
                                     // Accumulate streaming text
                                     accumulatedText += data.content;
-                                    setMessages(p => p.map(m =>
-                                        m.id === botTempId ? { ...m, content: accumulatedText } : m
-                                    ));
+
+                                    // Regex patterns for different response types
+                                    const dealRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"title"\s*:\s*"([^"]*)"\s*,\s*"description"\s*:\s*"([^"]*)"\s*,\s*"price"\s*:\s*(\d+(?:\.\d+)?)\s*,\s*"imageURL"\s*:\s*"([^"]*)"\s*\}/g;
+                                    const orderRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"productName"\s*:\s*"([^"]*)"\s*,\s*"status"\s*:\s*"([^"]*)"\s*,\s*"imageURL"\s*:\s*"([^"]*)"\s*,\s*"paymentUrl"\s*:\s*"([^"]*)"\s*\}/g;
+
+                                    setMessages(p => p.map(m => {
+                                        if (m.id !== botTempId) return m;
+
+                                        const currentMetadata = m.metadata || {};
+
+                                        // Check for deals
+                                        if (accumulatedText.includes('"type": "deals"') || accumulatedText.includes('"type":"deals"')) {
+                                            const deals: any[] = [];
+                                            let match;
+                                            while ((match = dealRegex.exec(accumulatedText)) !== null) {
+                                                deals.push({
+                                                    id: match[1],
+                                                    title: match[2],
+                                                    description: match[3],
+                                                    price: parseFloat(match[4]),
+                                                    imageURL: match[5]
+                                                });
+                                            }
+                                            if (deals.length > 0 && deals.length > (currentMetadata.deals?.length || 0)) {
+                                                return { ...m, type: "deals", metadata: { ...currentMetadata, deals }, content: "Here are some deals:", isThinking: false };
+                                            }
+                                        }
+
+                                        // Check for orders
+                                        if (accumulatedText.includes('"type": "orders"') || accumulatedText.includes('"type":"orders"')) {
+                                            const orders: any[] = [];
+                                            let match;
+                                            while ((match = orderRegex.exec(accumulatedText)) !== null) {
+                                                orders.push({
+                                                    id: match[1],
+                                                    productName: match[2],
+                                                    status: match[3],
+                                                    imageURL: match[4],
+                                                    paymentUrl: match[5]
+                                                });
+                                            }
+                                            if (orders.length > 0 && orders.length > (currentMetadata.orders?.length || 0)) {
+                                                return { ...m, type: "orders", metadata: { ...currentMetadata, orders }, content: "Here are your orders:", isThinking: false };
+                                            }
+                                        }
+
+                                        // For other responses, just show the text
+                                        return { ...m, content: accumulatedText };
+                                    }));
                                 } else if (data.type === "item") {
                                     // Progressive item streaming - add items one by one
+                                    // Also stop thinking UI once items start arriving
                                     setMessages(p => p.map(m => {
                                         if (m.id !== botTempId) return m;
 
@@ -114,20 +161,20 @@ export default function ChatPage() {
                                         if (data.itemType === "deal") {
                                             const deals = [...(currentMetadata.deals || []), data.item];
                                             newType = "deals";
-                                            return { ...m, type: newType, metadata: { ...currentMetadata, deals }, content: "Here are some deals:" };
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, deals }, content: "Here are some deals:", isThinking: false };
                                         } else if (data.itemType === "order") {
                                             const orders = [...(currentMetadata.orders || []), data.item];
                                             newType = "orders";
-                                            return { ...m, type: newType, metadata: { ...currentMetadata, orders }, content: "Here are your orders:" };
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, orders }, content: "Here are your orders:", isThinking: false };
                                         } else if (data.itemType === "payment") {
                                             const payments = [...(currentMetadata.payments || []), data.item];
                                             newType = "payments";
-                                            return { ...m, type: newType, metadata: { ...currentMetadata, payments }, content: "Here is your payment info:" };
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, payments }, content: "Here is your payment info:", isThinking: false };
                                         } else if (data.itemType === "paymentSummary") {
-                                            return { ...m, metadata: { ...currentMetadata, summary: data.item } };
+                                            return { ...m, metadata: { ...currentMetadata, summary: data.item }, isThinking: false };
                                         } else if (data.itemType === "profile") {
                                             newType = "profile";
-                                            return { ...m, type: newType, metadata: { ...currentMetadata, profile: data.item }, content: "Here is your profile:" };
+                                            return { ...m, type: newType, metadata: { ...currentMetadata, profile: data.item }, content: "Here is your profile:", isThinking: false };
                                         }
                                         return m;
                                     }));

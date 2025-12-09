@@ -146,65 +146,8 @@ export async function POST(request: NextRequest) {
                                     })}\n\n`)
                                 );
                             } else if (item.type === "tool_call_output_item") {
-                                // Try to parse tool output and stream items progressively
-                                try {
-                                    const output = item.output;
-                                    const parsed = typeof output === 'string' ? JSON.parse(output) : output;
-
-                                    // Stream individual items from tool results
-                                    if (parsed.type === "deals" && parsed.deals) {
-                                        for (const deal of parsed.deals) {
-                                            controller.enqueue(
-                                                encoder.encode(`data: ${JSON.stringify({
-                                                    type: "item",
-                                                    itemType: "deal",
-                                                    item: deal
-                                                })}\n\n`)
-                                            );
-                                        }
-                                    } else if (parsed.type === "orders" && parsed.orders) {
-                                        for (const order of parsed.orders) {
-                                            controller.enqueue(
-                                                encoder.encode(`data: ${JSON.stringify({
-                                                    type: "item",
-                                                    itemType: "order",
-                                                    item: order
-                                                })}\n\n`)
-                                            );
-                                        }
-                                    } else if (parsed.type === "payments" && parsed.payments) {
-                                        for (const payment of parsed.payments) {
-                                            controller.enqueue(
-                                                encoder.encode(`data: ${JSON.stringify({
-                                                    type: "item",
-                                                    itemType: "payment",
-                                                    item: payment
-                                                })}\n\n`)
-                                            );
-                                        }
-                                        // Also send summary
-                                        if (parsed.summary) {
-                                            controller.enqueue(
-                                                encoder.encode(`data: ${JSON.stringify({
-                                                    type: "item",
-                                                    itemType: "paymentSummary",
-                                                    item: parsed.summary
-                                                })}\n\n`)
-                                            );
-                                        }
-                                    } else if (parsed.type === "profile" && parsed.profile) {
-                                        controller.enqueue(
-                                            encoder.encode(`data: ${JSON.stringify({
-                                                type: "item",
-                                                itemType: "profile",
-                                                item: parsed.profile
-                                            })}\n\n`)
-                                        );
-                                    }
-                                } catch (e) {
-                                    // Ignore parse errors
-                                }
-
+                                // Tool completed - just send the thinking event
+                                // Cards will be rendered from the streaming text-delta JSON
                                 controller.enqueue(
                                     encoder.encode(`data: ${JSON.stringify({
                                         type: "thinking",
@@ -254,8 +197,29 @@ export async function POST(request: NextRequest) {
                         if (!responseContent) responseContent = "Here is the information you requested.";
                     }
 
-                    // Save bot message to DB
-                    const botMessage = await prisma.message.create({
+                    // Generate temp ID for immediate response
+                    const tempMessageId = crypto.randomUUID();
+
+                    // Send final structured output IMMEDIATELY (non-blocking)
+                    controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({
+                            type: "done",
+                            chatId: chat.id,
+                            message: {
+                                id: tempMessageId,
+                                role: "bot",
+                                content: responseContent,
+                                type: responseType,
+                                metadata: metadata,
+                                createdAt: new Date().toISOString(),
+                            }
+                        })}\n\n`)
+                    );
+
+                    controller.close();
+
+                    // Fire-and-forget: Save bot message to DB in background
+                    prisma.message.create({
                         data: {
                             chatId: chat.id,
                             role: "bot",
@@ -263,25 +227,9 @@ export async function POST(request: NextRequest) {
                             type: responseType,
                             metadata: metadata ?? undefined,
                         },
+                    }).catch((err) => {
+                        console.error("Failed to save bot message:", err);
                     });
-
-                    // Send final structured output
-                    controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({
-                            type: "done",
-                            chatId: chat.id,
-                            message: {
-                                id: botMessage.id,
-                                role: "bot",
-                                content: responseContent,
-                                type: responseType,
-                                metadata: metadata,
-                                createdAt: botMessage.createdAt,
-                            }
-                        })}\n\n`)
-                    );
-
-                    controller.close();
                 } catch (error) {
                     console.error("Streaming error:", error);
                     controller.enqueue(
