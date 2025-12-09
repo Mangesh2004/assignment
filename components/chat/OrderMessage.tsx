@@ -39,7 +39,7 @@ export function OrderMessage({ orders, content }: OrderMessageProps) {
                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                             />
                             <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 shadow-sm uppercase tracking-wider">
-                                {order.status}
+                                Confirmed
                             </div>
                         </div>
 
@@ -56,20 +56,9 @@ export function OrderMessage({ orders, content }: OrderMessageProps) {
                             </p>
 
                             <div className="mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-                                {order.paymentUrl ? (
-                                    <a
-                                        href={order.paymentUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-1"
-                                    >
-                                        Pay Now
-                                    </a>
-                                ) : (
-                                    <button className="w-full py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all shadow-sm flex items-center justify-center gap-1">
-                                        Track Order
-                                    </button>
-                                )}
+                                <button className="w-full py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all shadow-sm flex items-center justify-center gap-1">
+                                    Track Order
+                                </button>
                             </div>
                         </div>
                     </div>

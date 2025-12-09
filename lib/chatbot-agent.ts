@@ -113,9 +113,8 @@ export const placeOrderTool = tool({
     parameters: z.object({
         userId: z.string().describe("User ID"),
         dealId: z.string().describe("The ID of the deal/product to order. MUST be a valid ID from a previous deal search."),
-        paymentMethod: z.enum(["COD", "ONLINE"]).describe("Payment method: 'COD' (Cash on Delivery) or 'ONLINE' (Pay Now)"),
     }),
-    execute: async ({ userId, dealId, paymentMethod }) => {
+    execute: async ({ userId, dealId }) => {
         try {
             const deal = await prisma.deal.findUnique({ where: { id: dealId } });
             if (!deal) return JSON.stringify({ type: "text", content: "Deal not found or invalid Deal ID." });
@@ -126,17 +125,8 @@ export const placeOrderTool = tool({
                     productName: deal.title,
                     imageURL: deal.imageURL,
                     status: "confirmed", // Order created
-                    payment: {
-                        create: {
-                            amountPaid: paymentMethod === "ONLINE" ? deal.price : 0,
-                            pendingAmount: paymentMethod === "COD" ? deal.price : 0,
-                        }
-                    }
-                },
-                include: { payment: true }
+                }
             });
-
-            const paymentStatus = paymentMethod === "COD" ? "Pending (Cash on Delivery)" : "Paid (Online)";
 
             // RETURN AS "orders" TYPE so frontend renders card
             return JSON.stringify({
@@ -169,7 +159,6 @@ export const getOrdersTool = tool({
                 where: { userId },
                 take: 5, // Limit to 5 for better UI
                 orderBy: { createdAt: "desc" },
-                include: { payment: true },
             });
 
             if (orders.length === 0) {
@@ -183,16 +172,12 @@ export const getOrdersTool = tool({
                 type: "orders",
                 content: `Here are your recent orders:`,
                 orders: orders.map((order: any) => {
-                    // Check if payment is pending (assuming single payment record for simplicity or checking the latest)
-                    const isPending = order.status === "payment_pending";
-                    const paymentUrl = isPending ? `https://fake-payment-gateway.com/pay/${order.id}` : null;
-
                     return {
                         id: order.id,
                         productName: order.productName,
                         status: order.status,
                         imageURL: order.imageURL,
-                        paymentUrl: paymentUrl
+                        paymentUrl: "" // No payment flow
                     };
                 }),
             });
@@ -339,7 +324,7 @@ export function createChatbotAgent(userId: string) {
 4. **User Context**: Current User ID is "${userId}"`,
         tools: [getDealsTool, placeOrderTool, getOrdersTool, getPaymentStatusTool, getUserProfileTool],
         model: aisdk(google("gemini-3-pro-preview")),
-        
+
         outputType: AgentOutputSchema,
     });
 }
